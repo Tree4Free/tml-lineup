@@ -7,13 +7,24 @@ import { DAYS, type Day, type Orientation, type ShareState } from '../types';
 
 export const DEFAULT_STATE: ShareState = {
   v: 1,
-  day: 'SATURDAY',
+  day: 'FRIDAY',
   orient: 'h',
   focus: false,
   sel: [],
   notes: {},
   planNote: '',
 };
+
+// There's only something worth putting in the URL once the user has built a
+// plan — picks, a per-set note, or a plan note. View-only prefs (day,
+// orientation, focus) don't dirty the URL on their own.
+function isShareable(s: ShareState): boolean {
+  return (
+    s.sel.length > 0 ||
+    Object.keys(s.notes).length > 0 ||
+    s.planNote.trim() !== ''
+  );
+}
 
 export function encodeState(s: ShareState): string {
   return compressToEncodedURIComponent(JSON.stringify(s));
@@ -75,7 +86,10 @@ export function useUrlState(): [ShareState, (next: ShareState) => void] {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const update = (next: ShareState): void => {
-    history.replaceState(null, '', '#s=' + encodeState(next));
+    const url = isShareable(next)
+      ? '#s=' + encodeState(next)
+      : location.pathname + location.search; // clean URL until there's a plan
+    history.replaceState(null, '', url);
     setState(next);
   };
   return [state, update];
