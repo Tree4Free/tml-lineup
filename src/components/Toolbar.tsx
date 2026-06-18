@@ -1,4 +1,10 @@
-import { DAYS, type Day, type Orientation } from '../types';
+import {
+  DAYS,
+  WEEKENDS,
+  type Day,
+  type Orientation,
+  type Weekend,
+} from '../types';
 
 // Set this to hardcode the repo (e.g. with a custom domain); otherwise it's
 // derived from a GitHub Pages URL, where the path's first segment is the repo.
@@ -14,11 +20,13 @@ function repoUrl(): string {
 }
 
 interface Props {
+  weekend: Weekend;
   day: Day;
   orient: Orientation;
   focus: boolean;
   clashCount: number;
   selCount: number;
+  onWeekend: (w: Weekend) => void;
   onDay: (d: Day) => void;
   onOrient: (o: Orientation) => void;
   onFocus: (f: boolean) => void;
@@ -26,11 +34,13 @@ interface Props {
 }
 
 export function Toolbar({
+  weekend,
   day,
   orient,
   focus,
   clashCount,
   selCount,
+  onWeekend,
   onDay,
   onOrient,
   onFocus,
@@ -40,8 +50,21 @@ export function Toolbar({
     <header className="toolbar">
       <span className="brand">
         <span className="brand__dot" />
-        <strong className="brand__name">Tomorrowland 2026 W1</strong>
+        <strong className="brand__name">Tomorrowland 2026</strong>
       </span>
+
+      <div className="seg" title="Weekend">
+        {WEEKENDS.map((w) => (
+          <button
+            key={w}
+            type="button"
+            className={`seg__btn ${w === weekend ? 'seg__btn--on' : ''}`}
+            onClick={() => onWeekend(w)}
+          >
+            {w}
+          </button>
+        ))}
+      </div>
 
       <div className="seg">
         {DAYS.map((d) => (

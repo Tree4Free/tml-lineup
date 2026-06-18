@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
-import { dayLayout } from '../data/lineup';
+import type { DayLayout } from '../data/lineup';
 import { formatMinutes } from '../lib/time';
-import type { Day, Orientation, Performance } from '../types';
+import type { Orientation, Performance } from '../types';
 import { PerformanceBlock } from './PerformanceBlock';
 
 const PX_PER_MIN_H = 3.1;
@@ -13,7 +13,7 @@ const STAGE_LABEL = 132; // horizontal left-header (stage names) width
 const TIME_LABEL = 56; // vertical left-header (time ruler) width
 
 interface Props {
-  day: Day;
+  layout: DayLayout;
   orient: Orientation;
   performances: Performance[];
   selected: Set<string>;
@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function Timetable({
-  day,
+  layout,
   orient,
   performances,
   selected,
@@ -34,7 +34,6 @@ export function Timetable({
   onSelect,
 }: Props) {
   const isH = orient === 'h';
-  const layout = dayLayout[day];
   // Axis runs from the day's first set start to its last set end (both bucketed
   // by the date field), with 30 min of padding on each side so the first/last
   // blocks aren't flush against the edge.

@@ -1,6 +1,9 @@
 export const DAYS = ['FRIDAY', 'SATURDAY', 'SUNDAY'] as const;
 export type Day = (typeof DAYS)[number];
 
+export const WEEKENDS = ['W1', 'W2'] as const;
+export type Weekend = (typeof WEEKENDS)[number];
+
 export type Orientation = 'h' | 'v';
 
 export interface Artist {
@@ -31,17 +34,25 @@ export interface Performance {
   artists: Artist[];
 }
 
+/** A user's picks for one weekend. */
+export interface WeekendPlan {
+  /** Selected performance ids. */
+  sel: string[];
+  /** performanceId -> note (only kept for selected, present acts). */
+  notes: Record<string, string>;
+  /** One free-text note for the whole weekend. */
+  planNote: string;
+}
+
 /** The complete, shareable view — the single source of truth, encoded into the URL hash. */
 export interface ShareState {
-  v: 1;
+  v: 2;
+  /** Which weekend's lineup is loaded. */
+  weekend: Weekend;
   day: Day;
   orient: Orientation;
   /** Hide unselected sets when true. */
   focus: boolean;
-  /** Selected performance ids (span all days). */
-  sel: string[];
-  /** performanceId -> note. */
-  notes: Record<string, string>;
-  /** One free-text note for the whole plan. */
-  planNote: string;
+  /** Picks/notes kept separately per weekend (W1 and W2 share no act ids). */
+  plans: Record<Weekend, WeekendPlan>;
 }

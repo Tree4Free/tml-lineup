@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  A single-page <strong>festival clashfinder</strong> for the Tomorrowland 2026 (Weekend 1) lineup —
+  A single-page <strong>festival clashfinder</strong> for the Tomorrowland 2026 lineup (both weekends) —
   plan your sets, spot the clashes, and share your plan with a link. No backend, no account.
 </p>
 
@@ -11,7 +11,8 @@
 
 ## What it does
 
-- **Time × stage grid, one table per festival night** (Fri / Sat / Sun), built from the bundled lineup data.
+- **Time × stage grid, one table per festival night** (Fri / Sat / Sun), loaded live from Tomorrowland's lineup CDN.
+- **Weekend toggle** — switch between Weekend 1 and Weekend 2; each keeps its own independent lineup.
 - **Flip orientation** between Horizontal (time →) and Vertical (time ↓) — the same geometry, axes swapped.
 - **Click a set to add it to _My Lineup_** (click again to remove). No modal in the way.
 - **Clash detection** — overlapping picks are outlined and counted, but never blocked: keeping conflicting sets is the point.
@@ -28,6 +29,7 @@ The source lineup has a few quirks that the app handles deliberately:
 - **Times are read as the festival's fixed `+02:00` wall clock**, never localized, so the layout is identical in every timezone.
 - **Stages render in the festival's published order**, taken from [`src/data/stages.json`](src/data/stages.json).
 - **Clashes are detected per night** with a half-open `[start, end)` interval sweep; the rare same-stage overlap is laid out in sub-lanes.
+- **Lineup is fetched at runtime** from the CDN (per weekend) — there's no bundled copy. Picks are stored per weekend in the URL, and a pick is dropped automatically if that act disappears from the lineup.
 
 ## Tech stack
 
@@ -55,8 +57,8 @@ npm run dev      # start the dev server
 ```
 src/
   data/
-    lineup.json        # source lineup (408 performances)
-    lineup.ts          # normalize, group into festival nights, stage order, lanes, axis bounds
+    lineup.ts          # fetch CDN JSON + normalize, group into festival nights, stage order, lanes
+    useLineup.ts       # React hook: load a weekend, with loading / error / retry
     stages.json        # canonical stage order
   lib/
     time.ts            # timezone-stable minute math
