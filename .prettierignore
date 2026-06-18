@@ -1,0 +1,5 @@
+dist
+node_modules
+
+# Large static lineup dataset — bundled as-is, not hand-formatted.
+src/data/lineup.json

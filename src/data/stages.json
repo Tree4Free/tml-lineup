@@ -1,0 +1,19 @@
+{
+  "stages": [
+    { "id": "2643200378", "name": "MAINSTAGE" },
+    { "id": "2643185254", "name": "FREEDOM BY BUD" },
+    { "id": "2643140430", "name": "THE ROSE GARDEN" },
+    { "id": "2643140613", "name": "ELIXIR" },
+    { "id": "2643201588", "name": "CAGE" },
+    { "id": "2643201846", "name": "THE RAVE CAVE" },
+    { "id": "2643140614", "name": "PLANAXIS" },
+    { "id": "2643185065", "name": "MELODIA BY CORONA" },
+    { "id": "2643201714", "name": "CELESTIA BY KUCOIN" },
+    { "id": "2643217737", "name": "ATMOSPHERE" },
+    { "id": "2643154496", "name": "CORE" },
+    { "id": "2643217745", "name": "CRYSTAL GARDEN" },
+    { "id": "2643149032", "name": "THE GREAT LIBRARY" },
+    { "id": "2643217644", "name": "MOOSE BAR" },
+    { "id": "2643217646", "name": "HOUSE OF FORTUNE BY JBL" }
+  ]
+}

@@ -1,0 +1,28 @@
+<svg width="520" height="160" viewBox="0 0 520 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lineup Clashfinder">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d3bf5"/>
+      <stop offset="1" stop-color="#9a5cff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Icon: a mini time × stage grid with one selected block and one clash -->
+  <rect x="8" y="20" width="120" height="120" rx="26" fill="url(#g)"/>
+  <g opacity="0.9">
+    <!-- grid lines -->
+    <line x1="40" y1="44" x2="40" y2="116" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+    <line x1="68" y1="44" x2="68" y2="116" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+    <line x1="96" y1="44" x2="96" y2="116" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+    <!-- stage rows as blocks -->
+    <rect x="30" y="50" width="40" height="16" rx="5" fill="#ffffff" fill-opacity="0.55"/>
+    <rect x="74" y="74" width="32" height="16" rx="5" fill="#ffffff"/>
+    <rect x="44" y="98" width="46" height="16" rx="5" fill="#ffffff" fill-opacity="0.55"/>
+    <!-- clash marker -->
+    <circle cx="104" cy="58" r="9" fill="#ffffff"/>
+    <path d="M104 53.5v5M104 61.4v.2" stroke="#e0492f" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="152" y="74" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#1b1b22">Clashfinder</text>
+  <text x="153" y="104" font-family="Segoe UI, system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="#76767f">Tomorrowland 2026 · W1 timetable planner</text>
+</svg>

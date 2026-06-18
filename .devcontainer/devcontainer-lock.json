@@ -1,0 +1,9 @@
+{
+  "features": {
+    "ghcr.io/sliekens/devcontainer-features/claude:1": {
+      "version": "1.2.3",
+      "resolved": "ghcr.io/sliekens/devcontainer-features/claude@sha256:e29caf644384306f89f460a371165f985163143f80d8841919961d2216c52618",
+      "integrity": "sha256:e29caf644384306f89f460a371165f985163143f80d8841919961d2216c52618"
+    }
+  }
+}

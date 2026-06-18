@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npm run *)",
+      "Bash(npx @agent-native/core@latest plan blocks --out plan-blocks.md)",
+      "Bash(npx @agent-native/core@latest plan --help)",
+      "Bash(npx @agent-native/core@latest plan local --help)",
+      "Bash(npx @agent-native/core@latest plan local init --title \"Lineup Clashfinder\" --brief \"Festival timetable viewer for Lineup.json\" --kind plan --dir plans/lineup-clashfinder)",
+      "Bash(npx @agent-native/core@latest plan local serve --dir plans/lineup-clashfinder --kind plan)"
+    ]
+  }
+}

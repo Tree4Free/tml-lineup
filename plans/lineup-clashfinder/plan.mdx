@@ -1,0 +1,465 @@
+---
+title: 'Lineup Clashfinder'
+brief: 'Festival timetable viewer for Lineup.json — selectable grid, clash detection, notes, shareable via URL'
+kind: 'plan'
+localOnly: true
+---
+
+<RichText id="overview">
+
+# Lineup Clashfinder
+
+A single-page React app that turns `Lineup.json` (408 performances, 15 stages, 3 days) into a festival timetable you can plan against. The grid plots **time against stage**, one table per day, and can **flip between Horizontal and Vertical** orientation. You pick the sets you want, the app **flags clashes** between selected sets without preventing them, you can **annotate** each set and the plan as a whole, and the entire view is **encoded into the URL** so a link restores it exactly — no backend, no account.
+
+The app is branded **Tomorrowland 2026 W1** and is **mobile-first as well as desktop** (see the responsive decision). It builds directly on the Vite + React + TypeScript app already scaffolded in this repo (strict TS, ESLint, Prettier) and adds one runtime dependency — `lz-string` — for compact URL encoding; everything else is app code.
+
+</RichText>
+
+<RichText id="data-reality">
+
+## What the data looks like
+
+`Lineup.json` is `{ "performances": [...] }`. Each performance is flat and already carries the day and stage we need to bucket by — no joins, no fetch:
+
+</RichText>
+
+<Json
+  id="sample-perf"
+  title="One performance (real record)"
+  json={
+    '{\n  "id": "3006680274",\n  "name": "Space 92",\n  "artists": [{ "id": "...", "name": "Space 92" }],\n  "stage": { "id": "2643217646", "name": "FREEDOM BY BUD" },\n  "date": "2026-07-17",\n  "day": "FRIDAY",\n  "startTime": "2026-07-17 13:00:00+02:00",\n  "endTime": "2026-07-17 14:00:01+02:00"\n}'
+  }
+  collapsedDepth={2}
+/>
+
+<Callout id="data-facts" tone="info">
+
+**Facts that shape the build, derived from the file:** 408 performances · 15 stages · 3 days (`FRIDAY`/`SATURDAY`/`SUNDAY`, 17–19 Jul 2026) · times are all `+02:00` · **every record has a valid `startTime`/`endTime`** (no missing-time / NaN path to handle) · 26 sets run past midnight (only the `endTime` crosses to the next calendar day) · up to 3 artists per set · 7 `"More to be announced"` placeholders that carry real times and render like any other set. The `day`/`date` field — not the clock date — is the authoritative day bucket, so an overnight Friday set stays on the Friday table.
+
+</Callout>
+
+<RichText id="scope">
+
+## Objective & scope
+
+**Done means:** loading the app shows Saturday's grid (or whatever the URL encodes); I can switch days, flip orientation, click sets to build _My Lineup_, see overlaps among selected sets outlined, add per-set and plan-level notes, and copy a link that reopens the identical state in a fresh browser with no network.
+
+**In scope:** the timetable grid (both orientations), day tabs, selection + focus toggle, clash detection, notes, and URL-hash state with a Copy-link affordance.
+
+**Out of scope:** any server, persistence beyond the URL (no DB/login), editing the lineup data, search/filter by artist (a fast follow), and mobile-specific layouts beyond responsive grid behavior.
+
+</RichText>
+
+<RichText id="decisions-heading">
+
+## Key decisions
+
+These are the bets that are expensive to change once links are shared, so they are settled here.
+
+</RichText>
+
+<Callout id="decision-url" tone="decision">
+
+**State lives in `location.hash`, compressed with `lz-string`.** A single state object is JSON-stringified and run through `compressToEncodedURIComponent`, then stored after `#`. The hash is chosen over the query string because the fragment is **never sent to a server** (true serverless sharing, nothing in access logs) and survives static hosting. Selections are stored as raw performance `id`s (stable if the lineup file is regenerated) rather than array indices; `lz-string` collapses the repetitive 10-digit ids efficiently. A `v` field versions the schema so old links can be migrated.
+
+</Callout>
+
+<RichText id="state-shape-note">
+
+The encoded state object is small and explicit:
+
+</RichText>
+
+<Code
+  id="state-shape"
+  filename="src/state/urlState.ts"
+  language="ts"
+  caption="The shareable state — the only source of truth for the view."
+  code={
+    "export type ShareState = {\n  v: 1;\n  day: 'FRIDAY' | 'SATURDAY' | 'SUNDAY';\n  orient: 'h' | 'v';   // h = time on X axis, v = time on Y axis\n  focus: boolean;       // hide unselected sets\n  sel: string[];        // selected performance ids\n  notes: Record<string, string>; // performanceId -> note\n  planNote: string;     // one note for the whole plan\n};\n\nexport function encodeState(s: ShareState): string {\n  return compressToEncodedURIComponent(JSON.stringify(s));\n}\n\nexport function decodeState(hash: string): ShareState {\n  const raw = hash.replace(/^#s=/, '');\n  if (!raw) return DEFAULT_STATE;\n  try {\n    const json = decompressFromEncodedURIComponent(raw);\n    const parsed = json ? JSON.parse(json) : null;\n    return migrate(parsed); // validate shape + version, merge over defaults\n  } catch {\n    return DEFAULT_STATE; // unreadable/foreign hash → clean default view\n  }\n}\n\n// Currently only v:1 exists; migrate() is the seam that lets a future v:2\n// reshape old links instead of silently dropping a shared plan.\nfunction migrate(parsed: unknown): ShareState { /* ... */ }"
+  }
+/>
+
+<Callout id="decision-time" tone="decision">
+
+**The `date`/`day` field is authoritative for the day-table; positions anchor to it.** A set dated `2026-07-18` belongs to Saturday's table even though its `endTime` rolls into the 19th — bucket by the field, not the clock date (verified: `startTime`'s date always equals the `date` field; only the 26 overnight `endTime`s differ). Within a day, a set's minute offset is its wall-clock `HH:MM` plus `1440 ×` the calendar-day gap between that timestamp and the set's own `date`, so an overnight end lands at e.g. `1470` (24:30) and extends the same day's axis. Reading the string directly (never `new Date()` localization) keeps the layout identical in every viewer's timezone. Seconds are dropped and intervals are half-open `[start, end)`: the data ends sets at `:01`, so without truncation a set ending `14:00:01` would falsely overlap the next set starting `14:00:00` — at minute granularity those 348 boundary touches collapse to **3** genuine same-stage overlaps.
+
+</Callout>
+
+<Callout id="decision-conflict" tone="decision">
+
+**A clash is a time-overlap between two _selected_ sets in the same day, on any stage.** _My Lineup_ spans all three days, but clash detection runs **per day bucket** — sets on different days can't clash, and a Friday overnight set offset past 24:00 must not be compared against a Saturday set at the same wall clock. Within a day: sort selected by start, then for each set scan only the later sets that begin before it ends (an early `break` makes this linear for real lineups, not a full pairwise scan). Overlaps are surfaced — outline on the blocks, the active day's count in the toolbar, a banner in the detail popover — but never block selection, since keeping conflicting picks is the point.
+
+</Callout>
+
+<Callout id="decision-mobile" tone="decision">
+
+**Works on a phone, not just desktop.** The 15-stage grid can't fit a phone width, so on small screens the app defaults to **Vertical** orientation: the time axis pins to the left, stages scroll horizontally, and the toolbar collapses into a **sticky bottom bar** (Flip / Focus / Share). The note and share surfaces become full-width sheets instead of popovers. The Horizontal/Vertical toggle still works on mobile. This is CSS only (container/media queries) over the same `(offsetMinutes, stageIndex)` geometry — there is no separate mobile rendering path.
+
+</Callout>
+
+<Callout id="decision-flip" tone="decision">
+
+**One layout model, two orientations.** Position is always computed as `(offsetMinutes, stageIndex)`. Horizontal maps minutes→X and stage→row; Vertical maps minutes→Y and stage→column. The flip is a CSS-axis swap over the same computed geometry, not a second rendering path — so selection, notes, and clashes behave identically in both. A stage's track is normally a single lane, but the data has **3 genuine same-stage overlaps** (all Friday), so the track packs overlapping sets into sub-lanes (a thin second row/column) rather than letting blocks collide.
+
+</Callout>
+
+<RichText id="data-model-heading">
+
+## Data model (in-memory)
+
+</RichText>
+
+<DataModel
+  id="dm"
+  entities={[
+    {
+      id: 'performance',
+      name: 'Performance',
+      fields: [
+        { name: 'id', type: 'string', pk: true },
+        { name: 'name', type: 'string' },
+        { name: 'stageId', type: 'string', fk: 'stage.id' },
+        { name: 'day', type: 'Day' },
+        { name: 'startMin', type: 'number' },
+        { name: 'endMin', type: 'number' },
+        { name: 'artists', type: 'Artist[]' },
+      ],
+    },
+    {
+      id: 'stage',
+      name: 'Stage',
+      fields: [
+        { name: 'id', type: 'string', pk: true },
+        { name: 'name', type: 'string' },
+        { name: 'index', type: 'number' },
+      ],
+    },
+    {
+      id: 'artist',
+      name: 'Artist',
+      fields: [
+        { name: 'id', type: 'string', pk: true },
+        { name: 'name', type: 'string' },
+      ],
+    },
+  ]}
+  relations={[
+    { from: 'stage', to: 'performance', kind: '1-n' },
+    { from: 'performance', to: 'artist', kind: 'n-n' },
+  ]}
+/>
+
+<RichText id="files-heading">
+
+## File map
+
+New code lives under `src/`. `Lineup.json` moves to `src/data/lineup.json` so Vite bundles it (no fetch). The key modules:
+
+</RichText>
+
+<TabsBlock
+  id="files-tabs"
+  tabs={[
+    {
+      id: 'tab-lineup',
+      label: 'data/lineup.ts',
+      blocks: [
+        {
+          id: 'code-lineup',
+          type: 'annotated-code',
+          data: {
+            filename: 'src/data/lineup.ts',
+            language: 'ts',
+            code: "import raw from './lineup.json';\n\nexport const DAYS = ['FRIDAY', 'SATURDAY', 'SUNDAY'] as const;\n\nexport const performances = raw.performances.map(toPerformance);\nexport const stages = buildStageIndex(performances);\n\n// per-day axis bounds: earliest start, latest end (with +24h for overnight)\nexport const dayBounds = computeDayBounds(performances);",
+            annotations: [
+              {
+                lines: '1',
+                label: 'Bundled',
+                note: 'Direct JSON import — no runtime fetch, no server.',
+              },
+              {
+                lines: '6',
+                label: 'Normalize once',
+                note: 'Parse +02:00 times into startMin/endMin and a stable stage index.',
+              },
+              {
+                lines: '9',
+                note: "Each day's grid spans only its own sets' min start → max end.",
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: 'tab-time',
+      label: 'lib/time.ts',
+      blocks: [
+        {
+          id: 'code-time',
+          type: 'annotated-code',
+          data: {
+            filename: 'src/lib/time.ts',
+            language: 'ts',
+            code: "// Minutes from midnight of the set's OWN `date` field, read off the\n// +02:00 string (never new Date() localization, so layout is timezone-stable).\nexport function toMinutes(ts: string, dateField: string): number {\n  const dayGap = Math.round(\n    (Date.parse(ts.slice(0, 10)) - Date.parse(dateField)) / 86_400_000,\n  );\n  const hh = Number(ts.slice(11, 13));\n  const mm = Number(ts.slice(14, 16)); // seconds dropped; intervals are half-open\n  return dayGap * 1440 + hh * 60 + mm;\n}",
+            annotations: [
+              {
+                lines: '4-6',
+                label: 'Anchor on date',
+                note: "Overnight endTime (next calendar day) gets +1440; no circular dependency on the day's start.",
+              },
+              {
+                lines: '8',
+                label: 'Drop seconds',
+                note: 'Ends are :01; truncating keeps back-to-back sets from falsely overlapping.',
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: 'tab-conflicts',
+      label: 'lib/conflicts.ts',
+      blocks: [
+        {
+          id: 'code-conflicts',
+          type: 'annotated-code',
+          data: {
+            filename: 'src/lib/conflicts.ts',
+            language: 'ts',
+            code: '// Pass only the selected sets for ONE day bucket; offsets are day-local.\nexport function findClashes(daySelected: Performance[]): Set<string> {\n  const sorted = [...daySelected].sort((a, b) => a.startMin - b.startMin);\n  const clashing = new Set<string>();\n  for (let i = 0; i < sorted.length; i++) {\n    for (let j = i + 1; j < sorted.length; j++) {\n      if (sorted[j].startMin >= sorted[i].endMin) break;\n      clashing.add(sorted[i].id);\n      clashing.add(sorted[j].id);\n    }\n  }\n  return clashing;\n}',
+            annotations: [
+              {
+                lines: '2',
+                label: 'Per-day',
+                note: 'Called once per day; cross-day pairs are never compared.',
+              },
+              {
+                lines: '7',
+                label: 'Early break',
+                note: 'Sorted by start, so once j starts after i ends, no later set overlaps i — linear in practice.',
+              },
+              {
+                lines: '8-9',
+                note: 'Both sides of an overlap are flagged; selection is never blocked.',
+              },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      id: 'tab-state',
+      label: 'state/urlState.ts',
+      blocks: [
+        {
+          id: 'code-state-hook',
+          type: 'annotated-code',
+          data: {
+            filename: 'src/state/urlState.ts',
+            language: 'ts',
+            code: "export function useUrlState(): [ShareState, (next: ShareState) => void] {\n  const [state, setState] = useState(() => decodeState(location.hash));\n  useEffect(() => {\n    const onHash = () => setState(decodeState(location.hash));\n    window.addEventListener('hashchange', onHash);\n    return () => window.removeEventListener('hashchange', onHash);\n  }, []);\n  const update = (next: ShareState) => {\n    history.replaceState(null, '', '#s=' + encodeState(next));\n    setState(next);\n  };\n  return [state, update];\n}",
+            annotations: [
+              {
+                lines: '9',
+                label: 'replaceState',
+                note: 'Keeps the hash current without flooding history; note Back will NOT step through prior selections — switch to pushState if step-back is wanted.',
+              },
+              {
+                lines: '3-6',
+                note: 'hashchange fires when the user pastes/edits the link or opens a shared one — not on our own replaceState.',
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ]}
+/>
+
+<FileTree
+  id="tree"
+  title="Files added / changed"
+  entries={[
+    {
+      path: 'src/data/lineup.json',
+      change: 'added',
+      note: 'Moved from repo root; bundled by Vite.',
+    },
+    {
+      path: 'src/data/lineup.ts',
+      change: 'added',
+      note: 'Normalize + group by day, stage index, axis bounds.',
+    },
+    {
+      path: 'src/types.ts',
+      change: 'added',
+      note: 'Performance / Stage / Artist / ShareState / Day.',
+    },
+    {
+      path: 'src/lib/time.ts',
+      change: 'added',
+      note: 'Timezone-stable minute math.',
+    },
+    {
+      path: 'src/lib/conflicts.ts',
+      change: 'added',
+      note: 'Overlap sweep over selected sets.',
+    },
+    {
+      path: 'src/state/urlState.ts',
+      change: 'added',
+      note: 'Encode/decode + useUrlState hook (lz-string).',
+    },
+    {
+      path: 'src/components/Timetable.tsx',
+      change: 'added',
+      note: 'Grid for one day; orientation-aware.',
+    },
+    {
+      path: 'src/components/PerformanceBlock.tsx',
+      change: 'added',
+      note: 'Selected / clash / has-note states.',
+    },
+    {
+      path: 'src/components/Toolbar.tsx',
+      change: 'added',
+      note: 'Day tabs, flip, focus, clash count, Share.',
+    },
+    {
+      path: 'src/components/NotePopover.tsx',
+      change: 'added',
+      note: 'Per-set detail + note + clash banner.',
+    },
+    {
+      path: 'src/components/SharePanel.tsx',
+      change: 'added',
+      note: 'My Lineup, plan note, copy link.',
+    },
+    {
+      path: 'src/App.tsx',
+      change: 'modified',
+      note: 'Compose state hook + layout; replace starter content.',
+    },
+    {
+      path: 'src/App.css',
+      change: 'modified',
+      note: 'Grid, blocks, axis styling.',
+    },
+    {
+      path: 'package.json',
+      change: 'modified',
+      note: 'Add lz-string dependency.',
+    },
+  ]}
+/>
+
+<RichText id="dataflow-heading">
+
+## How state flows
+
+</RichText>
+
+<Diagram
+  id="flow"
+  data={{
+    html: "<div class='diagram-panel' data-rough style='display:flex;flex-direction:column;gap:14px'><div style='display:flex;align-items:center;gap:12px;justify-content:center'><div class='diagram-node'>URL #hash</div><div class='diagram-muted'>&rarr; decode (lz-string) &rarr;</div><div class='diagram-node'>ShareState</div><div class='diagram-muted'>&rarr; replaceState &larr;</div></div><div class='diagram-card' style='display:flex;flex-direction:column;gap:8px;padding:12px'><div class='diagram-muted'>derived once with useMemo</div><div style='display:flex;gap:10px;flex-wrap:wrap'><div class='diagram-pill'>day &rarr; performances[]</div><div class='diagram-pill'>sel &rarr; clash set</div><div class='diagram-pill'>orient &rarr; axis map</div></div></div><div style='display:flex;align-items:center;gap:12px;justify-content:center'><div class='diagram-node'>Toolbar</div><div class='diagram-node'>Timetable grid</div><div class='diagram-node'>Note / Share</div></div><div class='diagram-muted' style='text-align:center'>any user action &rarr; new ShareState &rarr; write hash &rarr; re-render</div></div>",
+    css: '.diagram-panel{padding:14px}.diagram-node{padding:6px 12px}.diagram-pill{padding:4px 10px}',
+    caption:
+      'Unidirectional: the URL hash is the single source of truth; every interaction rewrites it.',
+  }}
+/>
+
+<RichText id="steps-heading">
+
+## Build steps
+
+</RichText>
+
+<Checklist
+  id="steps"
+  items={[
+    {
+      id: 's1',
+      label:
+        'Move Lineup.json to src/data/lineup.json; add lz-string (npm i lz-string).',
+    },
+    {
+      id: 's2',
+      label:
+        'types.ts + data/lineup.ts: normalize records, build stage index, group by day, compute per-day axis bounds.',
+    },
+    {
+      id: 's3',
+      label:
+        'lib/time.ts and lib/conflicts.ts with the timezone-stable minute math and overlap sweep.',
+    },
+    {
+      id: 's4',
+      label:
+        'state/urlState.ts: ShareState, encode/decode, useUrlState hook on location.hash.',
+    },
+    {
+      id: 's5',
+      label:
+        'Timetable + PerformanceBlock: render one day in both orientations from (offsetMin, stageIndex).',
+    },
+    {
+      id: 's6',
+      label:
+        'Toolbar (day tabs, flip, focus, clash count, Share) and selection wiring through ShareState.',
+    },
+    {
+      id: 's7',
+      label:
+        'NotePopover + SharePanel: per-set note, plan note, copy-link with the encoded hash.',
+    },
+    {
+      id: 's8',
+      label: 'App.tsx composition; replace Vite starter content and styles.',
+    },
+  ]}
+/>
+
+<Callout id="risk-urllen" tone="risk">
+
+**URL length is the main risk.** Many selected sets plus long notes inflate the hash. `lz-string` keeps a typical lineup (a few dozen picks, short notes) well under common limits, but free-text notes are unbounded. Per the resolved decision, everything stays in the hash and links are allowed to grow; Copy-link **warns** when the URL passes ~8k chars rather than truncating or moving notes off the link.
+
+</Callout>
+
+<RichText id="verify-heading">
+
+## Verification
+
+</RichText>
+
+<RichText id="verify-body">
+
+End-to-end, in the browser (the workflow, not just types):
+
+1. `npm run dev` → Saturday grid renders 15 stages with real act names; `npm run build` and `npm run lint` stay clean.
+2. Click several sets including two that overlap (e.g. Space 92 16:30–18:00 and Dino Lenny 16:30–18:00) → both show the clash outline and the toolbar shows "2 clashes", but both stay selected.
+3. Flip Horizontal ↔ Vertical → the same picks, notes, and clashes appear with axes swapped.
+4. Add a per-set note and a plan note; switch day to Friday and confirm an overnight set (e.g. Franky Rizardo 23:00→00:30) sits at the late end of Friday, not on Saturday.
+5. Copy the link, open it in a fresh private window with **no network** → the exact day, orientation, selection, clashes, and both notes restore.
+6. Shrink to a phone viewport (~390px) → the grid switches to the vertical, horizontally scrollable layout with the time axis pinned and a sticky bottom bar (Flip / Focus / Share); selection and the clash outline still work by tap.
+
+</RichText>
+
+<RichText id="oq-heading">
+
+## Resolved decisions
+
+</RichText>
+
+<Callout id="resolved" tone="decision">
+
+The previously open choices are settled — there are no remaining open questions:
+
+- **Long shared links:** keep all state in the URL hash and allow links to grow; Copy-link **warns past ~8k chars** rather than truncating or moving notes off the link.
+- **Unselected sets:** the **full grid shows by default (Focus off)**; Focus hides unselected sets on demand.
+- **Branding / title:** the app is **Tomorrowland 2026 W1**.
+
+</Callout>
