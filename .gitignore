@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local-only plan bridge token (visual-plan); never commit
+plans/**/.plan-url
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
