@@ -47,7 +47,6 @@ export function Sidebar({
   onJump,
   onClose,
 }: Props) {
-  const [note, setNote] = useState(planNote);
   const [copied, setCopied] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(name);
@@ -209,10 +208,9 @@ export function Sidebar({
             <span className="muted small">Plan note</span>
             <textarea
               rows={2}
-              value={note}
+              value={planNote}
               placeholder="e.g. Meet at Cage entrance 15:00"
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={() => onPlanNote(note)}
+              onChange={(e) => onPlanNote(e.target.value)}
             />
           </label>
           <div className="field">
