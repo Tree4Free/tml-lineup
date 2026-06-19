@@ -74,6 +74,12 @@ export function SearchBox({ query, matchCount, onQuery, onJumpNext }: Props) {
           aria-label="Search acts"
           value={query}
           onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onJumpNext();
+            }
+          }}
         />
         {query !== '' && (
           <button
