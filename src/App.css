@@ -258,13 +258,38 @@
   align-items: center;
   gap: 6px;
   flex: 0 1 220px;
-  min-width: 130px;
+  min-width: 0;
+}
+/* Collapse-to-icon button — only used on phones (see media query). */
+.search-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.search-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+.search__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
   padding: 0 8px;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
-.search:focus-within {
+.search__field:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -293,6 +318,12 @@
 .search__input::-webkit-search-cancel-button {
   display: none;
 }
+.search__count {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
 .search__clear {
   flex: none;
   border: none;
@@ -306,8 +337,15 @@
 .search__clear:hover {
   color: var(--ink);
 }
-.search__count {
-  cursor: default;
+
+/* Orientation buttons show a label on desktop, an icon on phones. */
+.seg__icon {
+  display: none;
+  align-items: center;
+}
+.seg__icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .tab-dot {
@@ -714,6 +752,23 @@
   border-top: 1px solid var(--line);
   background: var(--surface-2);
 }
+.sidebar__source {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+.sidebar__source:hover {
+  color: var(--ink);
+}
+.sidebar__source svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
 
 /* ---------- Modal (comment) ---------- */
 .sheet-backdrop {
@@ -827,7 +882,8 @@ textarea:focus,
     border-top: 1px solid var(--line);
     border-bottom: none;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
+    padding: 8px 10px;
   }
   .brand {
     display: none;
@@ -838,8 +894,42 @@ textarea:focus,
   .lineup-toggle {
     display: inline-block;
   }
+  .ghlink {
+    display: none;
+  }
   .tt {
     margin: 8px;
+  }
+
+  /* Tighter toggle buttons */
+  .seg__btn {
+    padding: 5px 9px;
+  }
+
+  /* Orientation: icon instead of label */
+  .seg__label {
+    display: none;
+  }
+  .seg__icon {
+    display: inline-flex;
+  }
+
+  /* Search collapses to an icon; tapping it expands the field (and the icon
+     stays as the close/toggle, so the field's own leading icon is hidden). */
+  .search {
+    flex: 0 0 auto;
+  }
+  .search-toggle {
+    display: inline-flex;
+  }
+  .search:not(.search--open) .search__field {
+    display: none;
+  }
+  .search--open {
+    flex: 1 1 160px;
+  }
+  .search__field .search__icon {
+    display: none;
   }
 
   .scrim {

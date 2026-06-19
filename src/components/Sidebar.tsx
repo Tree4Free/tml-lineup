@@ -7,6 +7,7 @@ import {
   type Weekend,
 } from '../types';
 import { formatMinutes } from '../lib/time';
+import { GitHubLink } from './GitHubLink';
 
 interface Props {
   open: boolean;
@@ -229,6 +230,7 @@ export function Sidebar({
               </span>
             )}
           </div>
+          <GitHubLink className="sidebar__source" withLabel />
         </div>
       </aside>
     </>
