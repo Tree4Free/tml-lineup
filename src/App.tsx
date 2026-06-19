@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { findClashes } from './lib/conflicts';
 import { useLineups } from './data/useLineups';
@@ -20,6 +20,24 @@ const emptyGroups = (): Record<Day, Performance[]> => ({
   SATURDAY: [],
   SUNDAY: [],
 });
+
+// Scroll a performance block into view (next frame, so it works right after a
+// re-render) and optionally pulse it.
+function scrollToBlock(id: string, pulse: boolean): void {
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-perf-id="${CSS.escape(id)}"]`);
+    if (!(el instanceof HTMLElement)) return;
+    el.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'center',
+    });
+    if (pulse) {
+      el.classList.add('block--jump');
+      window.setTimeout(() => el.classList.remove('block--jump'), 900);
+    }
+  });
+}
 
 export default function App() {
   const [state, setState, hashInvalid] = useUrlState();
@@ -134,41 +152,30 @@ export default function App() {
       .sort((a, b) => a.startMin - b.startMin)
       .map((p) => p.id);
   }, [q, data, state.day, matches]);
-  const [jumpIdx, setJumpIdx] = useState(-1);
-  const [jumpReq, setJumpReq] = useState<{ id: string; n: number } | null>(
-    null,
-  );
+  const firstMatchId = matchList[0] ?? null;
+  const [jumpIdx, setJumpIdx] = useState(0);
 
   const setSearch = (next: string): void => {
     setQuery(next);
-    setJumpIdx(-1); // restart cycling for a new query
+    setJumpIdx(0); // the auto-focus below lands on the first match
   };
 
   const jumpToNextMatch = (): void => {
     if (matchList.length === 0) return;
     const next = (jumpIdx + 1) % matchList.length;
     setJumpIdx(next);
-    setJumpReq((prev) => ({ id: matchList[next], n: (prev?.n ?? 0) + 1 }));
+    scrollToBlock(matchList[next], true);
   };
 
-  // After a jump, scroll the target block into view and pulse it.
+  // Auto-scroll to the first result whenever it changes (typing, clearing,
+  // switching day with a query active). DOM-only — no state writes here.
+  const lastAutoFocus = useRef<string | null>(null);
   useEffect(() => {
-    if (!jumpReq) return;
-    const raf = requestAnimationFrame(() => {
-      const el = document.querySelector(
-        `[data-perf-id="${CSS.escape(jumpReq.id)}"]`,
-      );
-      if (!(el instanceof HTMLElement)) return;
-      el.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'center',
-      });
-      el.classList.add('block--jump');
-      window.setTimeout(() => el.classList.remove('block--jump'), 900);
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [jumpReq]);
+    if (firstMatchId && firstMatchId !== lastAutoFocus.current) {
+      scrollToBlock(firstMatchId, false);
+    }
+    lastAutoFocus.current = firstMatchId;
+  }, [firstMatchId]);
 
   // Grid data for the active day, optionally limited to stages that have a
   // selected set that day.
@@ -242,7 +249,7 @@ export default function App() {
         onWeekend={(weekend) => setState({ ...state, weekend })}
         onDay={(day) => {
           setState({ ...state, day });
-          setJumpIdx(-1);
+          setJumpIdx(0);
         }}
         onOrient={(orient) => setState({ ...state, orient })}
         onFocus={(focus) => setState({ ...state, focus })}
